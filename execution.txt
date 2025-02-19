@@ -1,0 +1,7 @@
+
+best weights with Harris : osnet_x_0_25_msmt1760
+
+moins best with Harris : osnet_x0_25_avecHarris.pt
+
+weights sans Harris : osnet_x0_25_sansHarris.pt
+
