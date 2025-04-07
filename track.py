@@ -37,7 +37,7 @@ from yolov7.utils.plots import plot_one_box
 from tracker.utils.parser import get_config
 from tracker.main_track import TrackerMain
 
-VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv'  # include video suffixes
+VID_FORMATS = 'asf', 'avi', 'gif', 'm4v', 'mkv', 'mov', 'mp4', 'mpeg', 'mpg', 'ts', 'wmv', 'webm'  # include video suffixes
 
 import cv2
 import numpy as np
@@ -69,7 +69,7 @@ def run(
         source='0',
         yolo_weights=WEIGHTS / 'yolov7.pt',
         Tweights=WEIGHTS / 'osnet_x0_25_msmt1760.pt',
-        imgsz=(640, 640),
+        imgsz=(1920, 1080),
         conf_thres=0.25,
         iou_thres=0.45,
         max_det=1000,
@@ -162,9 +162,9 @@ def run(
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     frame_count = 0
-    for frame_idx, (path, im, im0s, vid_cap) in enumerate(dataset):
+    for frame_idx, (path, im, _, vid_cap) in enumerate(dataset):
         s = ''
-
+        # Convert 'im' to tensor
         t1 = time_synchronized()
         im = torch.from_numpy(im).to(device)
         im = im.half() if half else im.float()  # uint8 to fp16/32
@@ -184,41 +184,33 @@ def run(
         pred = non_max_suppression(pred[0], conf_thres, iou_thres, classes, agnostic_nms)
         dt[2] += time_synchronized() - t3
 
-        # cv2.imshow('im', im)
-
-        f"""rame_count += 1
-        if frame_count % 30 == 0:  # Calculer les FPS toutes les 30 images
-            elapsed_time = time.time() - start_time
-            fps = frame_count / elapsed_time"""
-        # print(f"FPS: {fps:.2f}")"""
-
         # Process detections
         tracked_points = [[] for _ in range(len(pred))]
         for i, det in enumerate(pred):  # detections per image
             seen += 1
             if webcam:  # nr_sources >= 1
-                p, im0, _ = path[i], im0s[i].copy(), dataset.count
-                p = Path(p)  # to Path
+                p = Path(path[i])  # to Path
                 s += f'{i}: '
                 txt_file_name = p.name
                 save_path = str(save_dir / p.name) + str(i)  # im.jpg, vid.mp4, ...
             else:
-                p, im0, _ = path, im0s.copy(), getattr(dataset, 'frame', 0)
-                p = Path(p)  # to Path
-                # video file
+                p = Path(path)  # to Path
                 if source.endswith(VID_FORMATS):
                     txt_file_name = p.stem
                     save_path = str(save_dir / p.name)  # im.jpg, vid.mp4, ...
-                # folder with imgs
                 else:
                     txt_file_name = p.parent.name  # get folder name containing current img
                     save_path = str(save_dir / p.parent.name)  # im.jpg, vid.mp4, ...
 
-            curr_frames[i] = im0
-
             txt_path = str(save_dir / 'tracks' / txt_file_name)  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
-            imc = im0.copy() if save_crop else im0  # for save_crop
+
+            # Convert 'im' (tensor) to image for visualization (im0)
+            # Convert tensor to numpy (im0) for OpenCV
+            im0 = im[0].cpu().numpy().transpose(1, 2, 0) * 255  # Convert to HWC format and scale back to 0-255
+            im0 = im0.astype(np.uint8)  # Ensure it's in uint8 format for OpenCV
+            #print('im0 size : ', im0.shape)
+            # Now you can use im0 for OpenCV functions
 
 
             if det is not None and len(det):
@@ -247,32 +239,13 @@ def run(
                 fps = frame_count / elapsed_time
 
                 # Display the FPS on the frame
-                # Assuming 'im0' is the frame you are processing and displaying
-                cv2.putText(im0, f'FPS: {fps:.2f}', (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-
-                # draw boxes for visualization
+                #cv2.putText(im0, f'FPS: {fps:.2f}', (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                # Draw boxes for visualization
                 if len(outputs[i]) > 0:
                     for j, (output, conf) in enumerate(zip(outputs[i], confs)):
-
                         bboxes = output[0:4]
                         id = output[4]
                         cls = output[5]
-
-                        """if draw:
-                            # object trajectory
-                            center = ((int(bboxes[0]) + int(bboxes[2])) // 2, (int(bboxes[1]) + int(bboxes[3])) // 2)
-                            if id not in trajectory:
-                                trajectory[id] = []
-                            trajectory[id].append(center)
-                            for i1 in range(1, len(trajectory[id])):
-                                if trajectory[id][i1 - 1] is None or trajectory[id][i1] is None:
-                                    continue
-                                # thickness = int(np.sqrt(1000/float(i1+10))*0.3)
-                                thickness = 2
-                                try:
-                                    cv2.line(im0, trajectory[id][i1 - 1], trajectory[id][i1], (0, 255, 0), thickness)
-                                except:
-                                    pass"""
 
                         if save_txt:
                             # to MOT format
@@ -280,22 +253,21 @@ def run(
                             bbox_top = output[1]
                             bbox_w = output[2] - output[0]
                             bbox_h = output[3] - output[1]
+                            txt_file_path = txt_path + '.txt'
                             # Write MOT compliant results to file
                             with open(txt_path + '.txt', 'a') as f:
-                                f.write(('%g ' * 9 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
-                                                              # bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
-                                                              # f.write(('%g ' * 10 + '\n') % (frame_idx + 1, id, bbox_left,  # MOT format
-                                                              bbox_top, bbox_w, bbox_h, -1, -1, -1))
+                                f.write(('%g,' * 9 + '%g\n') % (
+                                frame_idx + 1, id, bbox_left, bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
 
                         if save_vid or save_crop or show_vid:  # Add bbox to image
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
-                            label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
-                                                                  (f'{id}'))
-                            plot_one_box(bboxes, im0, label=label, color=(0, 0, 255), line_thickness=3)
+                            label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else (f'{id}'))
+
+                            #plot_one_box(bboxes, im0,  color=(0, 0, 255), label=label, line_thickness=3)
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                                save_one_box(bboxes, imc, file=save_dir / 'crops' / txt_file_name / names[
+                                save_one_box(bboxes, im0, file=save_dir / 'crops' / txt_file_name / names[
                                     c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
                 print(f'{s}Done. YOLO:({t3 - t2:.3f}s), Tracker:({t5 - t4:.3f}s)')
@@ -303,30 +275,72 @@ def run(
             else:
                 trackerList[i].increment_ages()
                 print('No detections')
-
-            # Stream results
-            """if show_vid:
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond"""
-
-            """if show_vid:
-                blank_frame = np.zeros_like(im0)
-                display_frame = cv2.resize(im0, (960, 540))
-
-                # Calculate the position to center the resized frame on the blank frame
-                y_offset = (blank_frame.shape[0] - display_frame.shape[0]) // 2
-                x_offset = (blank_frame.shape[1] - display_frame.shape[1]) // 2
-
-                # Place the resized frame in the center of the blank frame
-                blank_frame[y_offset:y_offset + display_frame.shape[0],
-                x_offset:x_offset + display_frame.shape[1]] = display_frame
-
-                cv2.imshow(str(p), blank_frame)
-                cv2.waitKey(1)"""
-
+            # MP4 format
             if show_vid:
                 inf = (f'{s}Done. ({t2 - t1:.3f}s)')
                 # cv2.putText(im0, str(inf), (30,160), cv2.FONT_HERSHEY_SIMPLEX,0.7,(40,40,40),2)
+                cv2.imshow(str(p), im0)
+                if cv2.waitKey(1) == ord('q'):  # q to quit
+                    break
+
+            # Save results (image with detections)
+            """if save_vid:
+                if vid_path[i] != save_path:  # new video
+                    print('save path : ', save_path)
+                    vid_path[i] = save_path
+                    if isinstance(vid_writer[i], cv2.VideoWriter):
+                        vid_writer[i].release()  # release previous video writer
+                    if vid_cap:  # video
+                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    else:  # stream
+                        fps, w, h = 30, im0.shape[1], im0.shape[0]
+                    save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                vid_writer[i].write(im0)"""
+
+            if save_vid:
+                if vid_path[i] != save_path:
+                    vid_path[i] = save_path
+
+                    # Libérer l’ancien writer si besoin
+                    if isinstance(vid_writer[i], cv2.VideoWriter):
+                        vid_writer[i].release()
+
+                    # Déterminer taille & FPS
+                    if vid_cap:
+                        fps = vid_cap.get(cv2.CAP_PROP_FPS) or 30
+                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    else:
+                        fps = 30
+                        h, w = im0.shape[:2]
+
+                    # Assure l’extension .mp4
+                    save_path = str(Path(save_path).with_suffix('.mp4'))
+
+                    # Initialiser le writer
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # tu peux essayer 'XVID' ou 'avc1'
+                    vid_writer[i] = cv2.VideoWriter(save_path, fourcc, fps, (w, h))
+
+                    if not vid_writer[i].isOpened():
+                        print("Erreur : le writer vidéo n'a pas pu s'ouvrir.")
+
+
+                # S'assurer que im0 est bien un np.uint8 BGR
+                if isinstance(im0, torch.Tensor):
+                    im0 = im0.permute(1, 2, 0).cpu().numpy()
+                if im0.dtype != np.uint8:
+                    im0 = (im0 * 255).astype(np.uint8)
+
+                vid_writer[i].write(im0)
+
+            #webm format
+
+            """if show_vid:
+                inf = (f'{s}Done. ({t2 - t1:.3f}s)')
+                # cv2.putText(im0, str(inf), (30,160), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (40, 40, 40), 2)
                 cv2.imshow(str(p), im0)
                 if cv2.waitKey(1) == ord('q'):  # q to quit
                     break
@@ -344,9 +358,13 @@ def run(
                         h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     else:  # stream
                         fps, w, h = 30, im0.shape[1], im0.shape[0]
-                    save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                vid_writer[i].write(im0)
+
+                    # Save in WebM format using VP8 codec
+                    save_path = str(Path(save_path).with_suffix('.webm'))  # force *.webm suffix
+                    fourcc = cv2.VideoWriter_fourcc(*'VP80')  # VP8 codec (or 'VP90' for VP9)
+                    vid_writer[i] = cv2.VideoWriter(save_path, fourcc, fps, (w, h))
+                vid_writer[i].write(im0)"""
+
 
             prev_frames[i] = curr_frames[i]
 
@@ -364,9 +382,9 @@ def run(
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--yolo-weights', nargs='+', type=str, default=WEIGHTS / 'yolov7.pt', help='model.pt path(s)')
-    parser.add_argument('--Tweights', type=str, default=WEIGHTS / 'osnet_x0_25_350.pt')
+    parser.add_argument('--Tweights', type=str, default=WEIGHTS / '')
     parser.add_argument('--source', type=str, default='0', help='file/dir/URL/glob, 0 for webcam')
-    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
+    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, help='inference size h,w')
     parser.add_argument('--conf-thres', type=float, default=0.5, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.5, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
