@@ -68,6 +68,57 @@ def plot_one_box(x, img, color=None, label=None, line_thickness=3):
         cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
 
+def plot_one_box2(x, img, color=(128, 128, 128), label=None, line_thickness=3):
+    # Convert to integers
+    x = list(map(int, x))
+    c1, c2 = (x[0], x[1]), (x[2], x[3])  # top-left and bottom-right points of the box
+    if isinstance(img, np.ndarray):  # Ensure img is a numpy array
+        # Draw rectangle on the image
+        cv2.rectangle(img, c1, c2, color, thickness=line_thickness, lineType=cv2.LINE_AA)
+        if label:  # Draw label if available
+            tf = max(line_thickness - 1, 1)  # text font thickness
+            t_size = cv2.getTextSize(label, 0, fontScale=0.5, thickness=tf)[0]
+            c2 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)
+            cv2.rectangle(img, c1, c2, color, -1)  # Filled rectangle for label
+            cv2.putText(img, label, (c1[0], c1[1] - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, [255, 255, 255], thickness=tf)
+
+
+def plot_one_box3(x, img, color=(128, 128, 128), label=None, line_thickness=3):
+    # Ensure x is a list of four numbers (x1, y1, x2, y2)
+    x = list(map(int, x))  # Convert to integers
+
+    # Check if x is valid (ensure correct structure)
+    if len(x) != 4:
+        raise ValueError("Bounding box 'x' must contain 4 values: [x1, y1, x2, y2]")
+
+    c1, c2 = (x[0], x[1]), (x[2], x[3])  # top-left and bottom-right points of the box
+
+    # Check if img is a numpy array (ensure it is a valid image)
+    if not isinstance(img, np.ndarray):
+        raise TypeError("The 'img' parameter should be a NumPy array (image).")
+
+    # Check if the coordinates are within the image size
+    if not (0 <= c1[0] < img.shape[1] and 0 <= c1[1] < img.shape[0]):
+        raise ValueError(f"Top-left corner {c1} is out of image bounds.")
+    if not (0 <= c2[0] < img.shape[1] and 0 <= c2[1] < img.shape[0]):
+        raise ValueError(f"Bottom-right corner {c2} is out of image bounds.")
+
+    # Draw rectangle on the image
+    cv2.rectangle(img, c1, c2, color, thickness=line_thickness, lineType=cv2.LINE_AA)
+
+    # Draw label if available
+    if label:
+        tf = max(line_thickness - 1, 1)  # Text font thickness
+        t_size = cv2.getTextSize(label, 0, fontScale=0.5, thickness=tf)[0]  # Get text size
+        c2 = (c1[0] + t_size[0], c1[1] - t_size[1] - 3)  # Adjust position for the label box
+
+        # Draw filled rectangle for the label
+        cv2.rectangle(img, c1, c2, color, -1)  # Filled rectangle for label
+
+        # Put text on the image
+        cv2.putText(img, label, (c1[0], c1[1] - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.5, [255, 255, 255], thickness=tf)
+
+
 def plot_one_box_PIL(box, img, color=None, label=None, line_thickness=None):
     img = Image.fromarray(img)
     draw = ImageDraw.Draw(img)
