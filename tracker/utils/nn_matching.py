@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 import torch
-from torchreid.reid.metrics.distance import compute_distance_matrix
+from torchreid.metrics.distance import compute_distance_matrix
 
 sys.path.append('tracker/deep/reid')
 
