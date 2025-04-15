@@ -160,6 +160,7 @@ def run(
     outputs = [None] * nr_sources
     # Run tracking
     dt, seen = [0.0, 0.0, 0.0, 0.0], 0
+    timoo = 0
     curr_frames, prev_frames = [None] * nr_sources, [None] * nr_sources
     frame_count = 0
     for frame_idx, (path, im, _, vid_cap) in enumerate(dataset):
@@ -230,6 +231,7 @@ def run(
                 outputs[i] = trackerList[i].update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
                 t5 = time_synchronized()
                 dt[3] += t5 - t4
+                timoo += t5 - t4
                 frame_count += 1
 
                 # Calculate the elapsed time since the start
