@@ -22,7 +22,7 @@ class TrackerMain(object):
                  fp16,
                  cosine_threshold=0.2,
                  iou_threshold=0.7,
-                 max_age=500, frames=3,
+                 max_age=30, frames=3,
                  nn_=100,
                  lambda_=0.995,
                  alpha_=0.9
@@ -32,7 +32,7 @@ class TrackerMain(object):
 
         self.max_dist = cosine_threshold
         metric = NearestNeighborDistanceMetric(
-            "cosine", self.max_dist, nn_)
+            "euclidean", self.max_dist, nn_)
         self.tracker = Tracker(
             metric, max_iou_distance=iou_threshold, max_age=max_age, n_init=frames)
 

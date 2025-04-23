@@ -149,9 +149,9 @@ def run(
                 half,
                 cosine_threshold=0.2,
                 iou_threshold=0.7,
-                max_age=500,
+                max_age=30,
                 frames=3,
-                nn_=500,
+                nn_=100,
                 lambda_=0.995 ,
                 alpha_=0.9,
             )
